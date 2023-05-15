@@ -43,6 +43,7 @@ if __name__ == '__main__':
 
     import argparse
     import subprocess
+    import time
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--commit-number', '-n', type=int,
@@ -70,7 +71,8 @@ if __name__ == '__main__':
     git_checkout(onto_branch)
 
     if create_new_branch:
-        git_create_branch(f'{branch_name}-cp{num}-onto-{onto_branch}')
+        git_create_branch(
+            f'{branch_name}-cp{num}-onto-{onto_branch}-{time.strftime("%Y%m%d%H%M%S")}')
 
     git_cherry_pick(*commit_list)
 
