@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# example: source proxy-toggle.sh
+
 if [[ -n $http_proxy ]]; then
   echo 'disable http_proxy'
   unset http_proxy
