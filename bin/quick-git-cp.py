@@ -69,7 +69,7 @@ if __name__ == "__main__":
     parser.add_argument("--create-new-branch", "-c", action="store_true")
     parser.add_argument("--from-branch", "-f", type=str, help="from branch")
     parser.add_argument("--push", "-p", action="store_true")
-    parser.add_argument("--from-pr", type=str, help="PR ID")
+    parser.add_argument("--from-pr", type=str, help="PR ID. this option will override --commit-number")
 
     args = parser.parse_args()
 
@@ -86,8 +86,7 @@ if __name__ == "__main__":
     commits = [parse_commit_log(log)
                    for log in reversed(get_commit_list(num))
                    ] if not args.from_pr else get_commits_from_pr_id(args.from_pr)
-    print(commits)
-    exit()
+
     git_checkout(onto_branch)
 
     if create_new_branch:
