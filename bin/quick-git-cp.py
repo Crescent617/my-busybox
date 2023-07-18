@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import subprocess
+import json
 
 
 def get_commit_list(num):
@@ -31,7 +32,8 @@ def git_cherry_pick(*commits):
 
 
 def git_branch_name():
-    r = subprocess.run(["git", "branch", "--show-current"], stdout=subprocess.PIPE)
+    r = subprocess.run(["git", "branch", "--show-current"],
+                       stdout=subprocess.PIPE)
     r.check_returncode()
     return r.stdout.decode().strip()
 
@@ -39,6 +41,14 @@ def git_branch_name():
 def git_push():
     r = subprocess.run(["git", "push"])
     r.check_returncode()
+
+
+def get_commits_from_pr_id(pr_id):
+    r = subprocess.run(["gh", "pr", "view", pr_id, "--json",
+                       "commits"], stdout=subprocess.PIPE)
+    r.check_returncode()
+    d = json.loads(r.stdout.decode())
+    return [c["oid"] for c in d["commits"]]
 
 
 if __name__ == "__main__":
@@ -59,6 +69,7 @@ if __name__ == "__main__":
     parser.add_argument("--create-new-branch", "-c", action="store_true")
     parser.add_argument("--from-branch", "-f", type=str, help="from branch")
     parser.add_argument("--push", "-p", action="store_true")
+    parser.add_argument("--from-pr", type=str, help="PR ID")
 
     args = parser.parse_args()
 
@@ -69,10 +80,14 @@ if __name__ == "__main__":
 
     if from_branch is not None:
         git_checkout(from_branch)
+
     branch_name = git_branch_name()
 
-    commit_list = [parse_commit_log(log) for log in reversed(get_commit_list(num))]
-
+    commits = [parse_commit_log(log)
+                   for log in reversed(get_commit_list(num))
+                   ] if not args.from_pr else get_commits_from_pr_id(args.from_pr)
+    print(commits)
+    exit()
     git_checkout(onto_branch)
 
     if create_new_branch:
@@ -80,7 +95,7 @@ if __name__ == "__main__":
             f'{branch_name}-cp{num}-onto-{onto_branch}-{time.strftime("%Y%m%d%H%M%S")}'
         )
 
-    git_cherry_pick(*commit_list)
+    git_cherry_pick(*commits)
 
     if args.push:
         git_push()
