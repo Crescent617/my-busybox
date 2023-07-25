@@ -8,4 +8,4 @@ if [ -z "$word" ]; then
 fi
 
 escaped_word=$(echo $word | sed 's/ /%20/g')
-curl "http://dict.youdao.com/w/eng/$escaped_word" | pup '#results-contents' | lynx -stdin -dump | less
+curl "http://dict.youdao.com/w/eng/$escaped_word" 2>/dev/null | pup '#results-contents' | lynx -stdin -dump | less
