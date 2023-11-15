@@ -91,7 +91,7 @@ if __name__ == "__main__":
 
     if create_new_branch:
         git_create_branch(
-            f'{branch_name}-cp{num}-onto-{onto_branch}-{time.strftime("%Y%m%d%H%M%S")}'
+            f'{branch_name}-cp{num}-onto-{onto_branch}-{time.strftime("%Y%m%d%H%M%S")}'.replace("/", "-")
         )
 
     git_cherry_pick(*commits)
