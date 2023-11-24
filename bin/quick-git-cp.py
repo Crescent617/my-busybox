@@ -10,7 +10,7 @@ Use case 1: cherry-pick specific number of commits (-n) from a branch to another
 e.g. quick-git-cp.py --onto-branch V_6_59 -n 1 --create-new-branch --push
 
 Use case 2: cherry-pick commits from a PR and create a PR
-e.g. quick-git-cp.py --onto-branch V_6_60 --create-new-branch --create-pr --from-pr 111
+e.g. quick-git-cp.py --onto-branch origin/V_6_60 --create-new-branch --create-pr --from-pr 111
 """
 
 
@@ -28,6 +28,11 @@ def parse_commit_log(log):
 
 def git_checkout(branch):
     r = subprocess.run(["git", "checkout", branch])
+    r.check_returncode()
+
+
+def git_fetch():
+    r = subprocess.run(["git", "fetch"])
     r.check_returncode()
 
 
@@ -115,6 +120,8 @@ if __name__ == "__main__":
     from_branch = args.from_branch
     create_new_branch = args.create_new_branch
 
+    git_fetch()
+
     if from_branch is not None:
         git_checkout(from_branch)
 
@@ -131,7 +138,7 @@ if __name__ == "__main__":
             new_branch_name = f'cp-from-pr-{args.from_pr}-onto-{onto_branch}-{time.strftime("%Y%m%d%H%M%S")}'
         else:
             new_branch_name = f'{branch_name}-cp{num}-onto-{onto_branch}-{time.strftime("%Y%m%d%H%M%S")}'
-        git_create_branch(new_branch_name.replace('/', '-'))
+        git_create_branch(new_branch_name.replace('/', '_'))
 
     git_cherry_pick(*commits)
 
@@ -141,4 +148,4 @@ if __name__ == "__main__":
     if args.create_pr:
         reviewers = get_reviewers_from_pr_id(
             args.from_pr) if args.from_pr else []
-        gh_create_pr(onto_branch, reviewers)
+        gh_create_pr(onto_branch.split('/')[-1], reviewers)
