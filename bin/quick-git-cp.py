@@ -1,7 +1,17 @@
 #!/usr/bin/env python3
 
-import subprocess
+from functools import lru_cache
 import json
+import subprocess
+
+desc = "This script is for cherry-picking commits from one branch to another."
+usage = """
+Use case 1: cherry-pick specific number of commits (-n) from a branch to another branch
+e.g. quick-git-cp.py --onto-branch V_6_59 -n 1 --create-new-branch --push
+
+Use case 2: cherry-pick commits from a PR and create a PR
+e.g. quick-git-cp.py --onto-branch V_6_60 --create-new-branch --create-pr --from-pr 111
+"""
 
 
 def get_commit_list(num):
@@ -43,19 +53,43 @@ def git_push():
     r.check_returncode()
 
 
-def get_commits_from_pr_id(pr_id):
-    r = subprocess.run(["gh", "pr", "view", pr_id, "--json",
-                       "commits"], stdout=subprocess.PIPE)
+@lru_cache(maxsize=None)
+def get_pr_info(pr_id):
+    r = subprocess.run(["gh", "pr", "view", pr_id, "--json", "commits,reviews,reviewRequests"],
+                       stdout=subprocess.PIPE)
     r.check_returncode()
-    d = json.loads(r.stdout.decode())
+    return json.loads(r.stdout.decode())
+
+
+def get_commits_from_pr_id(pr_id):
+    d = get_pr_info(pr_id)
     return [c["oid"] for c in d["commits"]]
+
+
+def get_reviewers_from_pr_id(pr_id):
+    d = get_pr_info(pr_id)
+    reviewers = set(r['author']['login'] for r in d["reviews"])
+    reviewers |= set(r['login'] for r in d["reviewRequests"])
+    return list(reviewers)
+
+
+def gh_create_pr(branch_name=None, reviewers: list = []):
+    cmd = ["gh", "pr", "create", "--fill"]
+    if branch_name is not None:
+        cmd += ["-B", branch_name]
+
+    for reviewer in reviewers:
+        cmd += ["-r", reviewer]
+
+    r = subprocess.run(cmd)
+    r.check_returncode()
 
 
 if __name__ == "__main__":
     import argparse
     import time
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(usage=usage, description=desc)
     parser.add_argument(
         "--commit-number",
         "-n",
@@ -67,9 +101,12 @@ if __name__ == "__main__":
         "--onto-branch", "-o", type=str, help="onto branch", required=True
     )
     parser.add_argument("--create-new-branch", "-c", action="store_true")
-    parser.add_argument("--from-branch", "-f", type=str, help="from branch")
+    parser.add_argument("--from-branch", "-f", type=str,
+                        help="default: current branch")
     parser.add_argument("--push", "-p", action="store_true")
-    parser.add_argument("--from-pr", type=str, help="PR ID. this option will override --commit-number")
+    parser.add_argument("--from-pr", type=str,
+                        help="PR ID. this option will override --commit-number")
+    parser.add_argument("--create-pr", action="store_true")
 
     args = parser.parse_args()
 
@@ -84,17 +121,23 @@ if __name__ == "__main__":
     branch_name = git_branch_name()
 
     commits = [parse_commit_log(log)
-                   for log in reversed(get_commit_list(num))
-                   ] if not args.from_pr else get_commits_from_pr_id(args.from_pr)
+               for log in reversed(get_commit_list(num))
+               ] if not args.from_pr else get_commits_from_pr_id(args.from_pr)
 
     git_checkout(onto_branch)
 
     if create_new_branch:
         git_create_branch(
-            f'{branch_name}-cp{num}-onto-{onto_branch}-{time.strftime("%Y%m%d%H%M%S")}'.replace("/", "-")
+            f'{branch_name}-cp{num}-onto-{onto_branch}-{time.strftime("%Y%m%d%H%M%S")}'.replace(
+                "/", "-")
         )
 
     git_cherry_pick(*commits)
 
-    if args.push:
+    if args.push or args.create_pr:
         git_push()
+
+    if args.create_pr:
+        reviewers = get_reviewers_from_pr_id(
+            args.from_pr) if args.from_pr else []
+        gh_create_pr(onto_branch, reviewers)
