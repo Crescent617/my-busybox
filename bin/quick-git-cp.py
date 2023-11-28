@@ -14,6 +14,17 @@ e.g. quick-git-cp.py --onto-branch origin/V_6_60 --create-new-branch --create-pr
 """
 
 
+def step_info(step_name):
+    print('='*10, 'STEP:', step_name, '='*10)
+
+
+def step_info_decorator(func):
+    def wrapper(*args, **kwargs):
+        step_info(func.__name__)
+        return func(*args, **kwargs)
+    return wrapper
+
+
 def get_commit_list(num):
     logs = subprocess.run(
         ["git", "log", "--pretty=format:%h %s", "-n", str(num)], stdout=subprocess.PIPE
@@ -26,21 +37,25 @@ def parse_commit_log(log):
     return log.split(" ", 1)[0]
 
 
+@step_info_decorator
 def git_checkout(branch):
     r = subprocess.run(["git", "checkout", branch])
     r.check_returncode()
 
 
+@step_info_decorator
 def git_fetch():
     r = subprocess.run(["git", "fetch"])
     r.check_returncode()
 
 
+@step_info_decorator
 def git_create_branch(branch):
     r = subprocess.run(["git", "checkout", "-b", branch])
     r.check_returncode()
 
 
+@step_info_decorator
 def git_cherry_pick(*commits):
     r = subprocess.run(["git", "cherry-pick", *commits])
     r.check_returncode()
@@ -53,6 +68,7 @@ def git_branch_name():
     return r.stdout.decode().strip()
 
 
+@step_info_decorator
 def git_push():
     r = subprocess.run(["git", "push"])
     r.check_returncode()
@@ -78,6 +94,7 @@ def get_reviewers_from_pr_id(pr_id):
     return list(reviewers)
 
 
+@step_info_decorator
 def gh_create_pr(branch_name=None, reviewers: list = []):
     cmd = ["gh", "pr", "create", "--fill"]
     if branch_name is not None:
