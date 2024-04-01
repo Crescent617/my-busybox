@@ -15,13 +15,14 @@ e.g. quick-git-cp.py --onto-branch origin/V_6_60 --create-new-branch --create-pr
 
 
 def step_info(step_name):
-    print('='*10, 'STEP:', step_name, '='*10)
+    print("=" * 10, "STEP:", step_name, "=" * 10)
 
 
 def step_info_decorator(func):
     def wrapper(*args, **kwargs):
         step_info(func.__name__)
         return func(*args, **kwargs)
+
     return wrapper
 
 
@@ -62,8 +63,7 @@ def git_cherry_pick(*commits):
 
 
 def git_branch_name():
-    r = subprocess.run(["git", "branch", "--show-current"],
-                       stdout=subprocess.PIPE)
+    r = subprocess.run(["git", "branch", "--show-current"], stdout=subprocess.PIPE)
     r.check_returncode()
     return r.stdout.decode().strip()
 
@@ -75,33 +75,41 @@ def git_push():
 
 
 @lru_cache(maxsize=None)
-def get_pr_info(pr_id):
-    r = subprocess.run(["gh", "pr", "view", pr_id, "--json", "commits,reviews,reviewRequests"],
-                       stdout=subprocess.PIPE)
+def _get_pr_info(pr_id):
+    r = subprocess.run(
+        ["gh", "pr", "view", pr_id, "--json", "commits,reviews,reviewRequests,title"],
+        stdout=subprocess.PIPE,
+    )
     r.check_returncode()
     return json.loads(r.stdout.decode())
 
 
 def get_commits_from_pr_id(pr_id):
-    d = get_pr_info(pr_id)
+    d = _get_pr_info(pr_id)
     return [c["oid"] for c in d["commits"]]
 
 
-def get_reviewers_from_pr_id(pr_id):
-    d = get_pr_info(pr_id)
-    reviewers = set(r['author']['login'] for r in d["reviews"])
-    reviewers |= set(r['login'] for r in d["reviewRequests"])
-    return list(reviewers)
+def get_pr_info(pr_id):
+    d = _get_pr_info(pr_id)
+    reviewers = set(r["author"]["login"] for r in d["reviews"])
+    reviewers |= set(r["login"] for r in d["reviewRequests"])
+    return {
+        "reviewers": list(reviewers),
+        "title": d["title"],
+    }
 
 
 @step_info_decorator
-def gh_create_pr(branch_name=None, reviewers: list = []):
+def gh_create_pr(branch_name=None, reviewers: list = [], title=None):
     cmd = ["gh", "pr", "create", "--fill"]
     if branch_name is not None:
         cmd += ["-B", branch_name]
 
     for reviewer in reviewers:
         cmd += ["-r", reviewer]
+
+    if title:
+        cmd += ["-t", title]
 
     r = subprocess.run(cmd)
     r.check_returncode()
@@ -123,11 +131,11 @@ if __name__ == "__main__":
         "--onto-branch", "-o", type=str, help="onto branch", required=True
     )
     parser.add_argument("--create-new-branch", "-c", action="store_true")
-    parser.add_argument("--from-branch", "-f", type=str,
-                        help="default: current branch")
+    parser.add_argument("--from-branch", "-f", type=str, help="default: current branch")
     parser.add_argument("--push", "-p", action="store_true")
-    parser.add_argument("--from-pr", type=str,
-                        help="PR ID. this option will override --commit-number")
+    parser.add_argument(
+        "--from-pr", type=str, help="PR ID. this option will override --commit-number"
+    )
     parser.add_argument("--create-pr", action="store_true")
 
     args = parser.parse_args()
@@ -144,9 +152,11 @@ if __name__ == "__main__":
 
     branch_name = git_branch_name()
 
-    commits = [parse_commit_log(log)
-               for log in reversed(get_commit_list(num))
-               ] if not args.from_pr else get_commits_from_pr_id(args.from_pr)
+    commits = (
+        [parse_commit_log(log) for log in reversed(get_commit_list(num))]
+        if not args.from_pr
+        else get_commits_from_pr_id(args.from_pr)
+    )
 
     git_checkout(onto_branch)
 
@@ -155,7 +165,7 @@ if __name__ == "__main__":
             new_branch_name = f'cp-from-pr-{args.from_pr}-onto-{onto_branch}-{time.strftime("%Y%m%d%H%M%S")}'
         else:
             new_branch_name = f'{branch_name}-cp{num}-onto-{onto_branch}-{time.strftime("%Y%m%d%H%M%S")}'
-        git_create_branch(new_branch_name.replace('/', '_'))
+        git_create_branch(new_branch_name.replace("/", "_"))
 
     git_cherry_pick(*commits)
 
@@ -163,6 +173,12 @@ if __name__ == "__main__":
         git_push()
 
     if args.create_pr:
-        reviewers = get_reviewers_from_pr_id(
-            args.from_pr) if args.from_pr else []
-        gh_create_pr(onto_branch.split('/')[-1], reviewers)
+        info = get_pr_info(args.from_pr) if args.from_pr else {}
+        title = info.get("title", None)
+        if title:
+            title = f"{title} [cherry-pick]"
+        gh_create_pr(
+            onto_branch.split("/")[-1],
+            info.get("reviewers", None),
+            title,
+        )
