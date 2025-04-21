@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+# Function to encode data to Base64
+osc52_copy() {
+  local data="$1"
+  local encoded
+  encoded=$(printf "%s" "$data" | base64 | tr -d '\n')
+
+  printf '\033]52;c;%s\033\\' "$encoded"
+}
+
+# Read input data
+if [ -t 0 ]; then
+  osc52_copy "$1"
+else
+  input=$(cat)
+  osc52_copy "$input"
+fi
