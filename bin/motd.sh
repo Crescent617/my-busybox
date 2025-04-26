@@ -28,9 +28,21 @@ mark_gray() {
   echo -e "\033[0;37m$1\033[0m"
 }
 
-command -v todo.sh &>/dev/null && todo.sh list && echo '---'
+cmd_exists() {
+  command -v "$1" &>/dev/null
+  return $?
+}
 
-if command -v checkupdates &>/dev/null; then
+if cmd_exists todo.sh; then
+  todos=$(todo.sh list)
+  if cmd_exists boxes; then
+    echo "$todos" | boxes -d ansi-rounded
+  else
+    echo "$todos"
+  fi
+fi
+
+if cmd_exists checkupdates; then
   cur_file=/tmp/motd_checkupdates
 
   # not exist or older than 12 hours
