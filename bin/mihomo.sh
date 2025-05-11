@@ -8,6 +8,7 @@ mkdir -p "${MIHOMO_DIR}"
 # Function to check and download the config file
 download_config() {
   config_file="${MIHOMO_DIR}/config.yaml"
+  ui_dir="${MIHOMO_DIR}/ui"
   sub_url=$1
   # Check if SUB_URL is set
   if [ -z "$sub_url" ]; then
@@ -16,6 +17,7 @@ download_config() {
   fi
   echo "[+] 下载订阅中..."
   curl -m 10 -L -H "User-Agent: Clash" -o "${config_file}" "${sub_url}"
+  yq -i ".external-ui = \"${ui_dir}\"" "${config_file}"
 }
 
 # Function to download the UI
@@ -24,7 +26,6 @@ download_ui() {
   if [ ! -d "${ui_dir}" ]; then
     echo "[+] 下载 UI..."
     git clone https://github.com/metacubex/metacubexd.git -b gh-pages --depth 1 "${ui_dir}"
-    yq -i ".external-ui = \"${ui_dir}\"" "${config_file}"
   fi
 }
 
