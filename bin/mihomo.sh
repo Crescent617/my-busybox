@@ -5,8 +5,23 @@ set -euo pipefail
 MIHOMO_DIR="${HOME}/.config/mihomo"
 mkdir -p "${MIHOMO_DIR}"
 
+config_tmpl=$(
+  cat <<EOF
+port: 7890
+socks-port: 7891
+redir-port: 7892
+allow-lan: false
+mode: rule
+log-level: silent
+external-controller: '0.0.0.0:9090'
+secret: ''
+external-ui: /home/hrli/.config/mihomo/ui
+EOF
+)
+
 # Function to check and download the config file
 download_config() {
+  sub_config="${MIHOMO_DIR}/sub.yaml"
   config_file="${MIHOMO_DIR}/config.yaml"
   ui_dir="${MIHOMO_DIR}/ui"
   sub_url=$1
@@ -16,8 +31,27 @@ download_config() {
     exit 1
   fi
   echo "[+] 下载订阅中..."
-  curl -m 10 -L -H "User-Agent: Clash" -o "${config_file}" "${sub_url}"
-  yq -i ".external-ui = \"${ui_dir}\"" "${config_file}"
+  echo "$sub_url" >"${MIHOMO_DIR}/sub_url.txt"
+  curl -m 10 -L -H "User-Agent: Clash" -o "${sub_config}" "${sub_url}"
+  if [ $? -ne 0 ]; then
+    echo "[x] 下载订阅失败"
+    exit 1
+  fi
+
+  # add sub_config's proxies to config_tmpl
+  echo "[+] 生成配置文件..."
+  proxies=$(yq -r '.proxies' "${sub_config}")
+  if [[ $? -ne 0 ]]; then
+    echo "[x] 解析订阅失败"
+    exit 1
+  fi
+  if [[ -z "$proxies" ]]; then
+    echo "[x] 订阅文件中没有 proxies"
+    exit 1
+  fi
+
+  echo "$config_tmpl" >"${config_file}"
+  yq -i '.proxies = load("'$sub_config'").proxies' "${config_file}"
 }
 
 # Function to download the UI
@@ -50,7 +84,7 @@ run)
   run
   ;;
 download_config)
-  download_config $SUB_URL
+  download_config $CLASH_SUB_URL
   ;;
 download_ui)
   download_ui
@@ -59,7 +93,7 @@ download_mmdb)
   download_mmdb
   ;;
 init)
-  download_config $SUB_URL
+  download_config $CLASH_SUB_URL
   download_ui
   download_mmdb
   ;;
