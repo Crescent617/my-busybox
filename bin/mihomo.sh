@@ -21,6 +21,9 @@ EOF
 
 # Function to check and download the config file
 download_config() {
+  default_config="${MIHOMO_DIR}/config_default.yaml"
+  echo "$config_tmpl" >"${default_config}"
+
   sub_config="${MIHOMO_DIR}/sub.yaml"
   config_file="${MIHOMO_DIR}/config.yaml"
   ui_dir="${MIHOMO_DIR}/ui"
@@ -50,8 +53,8 @@ download_config() {
     exit 1
   fi
 
-  echo "$config_tmpl" >"${config_file}"
-  yq -i '.proxies = load("'$sub_config'").proxies' "${config_file}"
+  # merge config_tmpl and sub_config
+  yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "${sub_config}" "${default_config}" >"${config_file}"
 }
 
 # Function to download the UI
