@@ -33,15 +33,43 @@ cmd_exists() {
   return $?
 }
 
+os_logo() {
+  case $(uname -s) in
+  Darwin)
+    echo " "
+    ;;
+  Linux)
+    echo " "
+    ;;
+  *)
+    echo " "
+    ;;
+  esac
+}
+
+# ==== System Information ====
+fastfetch --logo small -s "break:os:cpu:gpu:memory:disk:uptime" 2>/dev/null
+if [ $? -ne 0 ]; then
+  mark_blue "$(os_logo) $(uptime)"
+fi
+echo ""
+
+# ==== Todo List ====
 if cmd_exists todo.sh; then
-  todos=$(todo.sh list)
+  # keep lines start with number
+  title=$(mark_cyan "  TODO")
+  todos="$(todo.sh list | awk '/^\x1b\[[0-9;]*m*[0-9]/')"
+  if [ -z "$todos" ]; then
+    todos="Nice! No todos today. 🤪"
+  fi
   if cmd_exists boxes; then
-    echo "$todos" | boxes -d ansi-rounded
+    echo -e "$title\n--\n$todos" | boxes -d ansi-rounded
   else
-    echo "$todos"
+    echo -e "$title\n--\n$todos"
   fi
 fi
 
+# ==== Package Updates ====
 if cmd_exists checkupdates; then
   cur_file=/tmp/motd_checkupdates
 
@@ -57,5 +85,3 @@ if cmd_exists checkupdates; then
 
   mark_cyan "$(cat $cur_file)"
 fi
-
-mark_blue " $(uptime)"
