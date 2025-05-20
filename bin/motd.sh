@@ -48,11 +48,11 @@ os_logo() {
 }
 
 # ==== System Information ====
-fastfetch --logo small -s "break:os:cpu:gpu:memory:disk:uptime" 2>/dev/null
-if [ $? -ne 0 ]; then
-  mark_blue "$(os_logo) $(uptime)"
-fi
-echo ""
+# fastfetch --logo small -s "break:os:cpu:gpu:memory:disk:uptime" 2>/dev/null
+# if [ $? -ne 0 ]; then
+#   mark_blue "$(os_logo) $(uptime)"
+# fi
+# echo ""
 
 # ==== Package Updates ====
 if cmd_exists checkupdates; then
@@ -64,11 +64,10 @@ if cmd_exists checkupdates; then
     UPDATES=$(checkupdates 2>/dev/null)
     NUM_UPDATES=$(echo "$UPDATES" | sed '/^$/d' | wc -l)
     if [ "$NUM_UPDATES" -gt 0 ]; then
-      echo "󰮯 $NUM_UPDATES updates available." >"$cur_file"
+      mark_cyan "󰮯 $NUM_UPDATES updates available."
     fi
   fi
 
-  mark_cyan "$(cat $cur_file)\n"
 fi
 
 # ==== Todo List ====
@@ -85,4 +84,3 @@ if cmd_exists todo.sh; then
     echo -e "$title\n--\n$todos"
   fi
 fi
-
