@@ -54,6 +54,23 @@ if [ $? -ne 0 ]; then
 fi
 echo ""
 
+# ==== Package Updates ====
+if cmd_exists checkupdates; then
+  cur_file=/tmp/motd_checkupdates
+
+  # not exist or older than 12 hours
+  if [ ! -f "$cur_file" ] || [ "$(find "$cur_file" -mmin +720)" ]; then
+    touch "$cur_file"
+    UPDATES=$(checkupdates 2>/dev/null)
+    NUM_UPDATES=$(echo "$UPDATES" | sed '/^$/d' | wc -l)
+    if [ "$NUM_UPDATES" -gt 0 ]; then
+      echo "󰮯 $NUM_UPDATES updates available." >"$cur_file"
+    fi
+  fi
+
+  mark_cyan "$(cat $cur_file)\n"
+fi
+
 # ==== Todo List ====
 if cmd_exists todo.sh; then
   # keep lines start with number
@@ -69,19 +86,3 @@ if cmd_exists todo.sh; then
   fi
 fi
 
-# ==== Package Updates ====
-if cmd_exists checkupdates; then
-  cur_file=/tmp/motd_checkupdates
-
-  # not exist or older than 12 hours
-  if [ ! -f "$cur_file" ] || [ "$(find "$cur_file" -mmin +720)" ]; then
-    touch "$cur_file"
-    UPDATES=$(checkupdates 2>/dev/null)
-    NUM_UPDATES=$(echo "$UPDATES" | sed '/^$/d' | wc -l)
-    if [ "$NUM_UPDATES" -gt 0 ]; then
-      echo "󰮯 $NUM_UPDATES updates available." >"$cur_file"
-    fi
-  fi
-
-  mark_cyan "$(cat $cur_file)"
-fi
