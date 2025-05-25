@@ -68,10 +68,16 @@ download_ui() {
 
 # Function to download the mmdb file
 download_mmdb() {
-  mmdb_path="${MIHOMO_DIR}/Country.mmdb"
+  mmdb_path="${MIHOMO_DIR}/Country.mmdb.temp"
   if [ ! -f "${mmdb_path}" ]; then
     echo "[+] 下载 mmdb 文件..."
     curl -m 10 -L -H "User-Agent: Clash" -o "${mmdb_path}" "https://cdn.jsdelivr.net/gh/Dreamacro/maxmind-geoip@release/Country.mmdb"
+    if [ $? -ne 0 ]; then
+      echo "[x] 下载 mmdb 文件失败"
+      exit 1
+    fi
+    # rename to Country.mmdb
+    mv "${mmdb_path}" "${MIHOMO_DIR}/Country.mmdb"
   fi
 }
 
