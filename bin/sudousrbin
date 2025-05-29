@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# This script is used to run a command with sudo privileges
+# first arg is the command to run, the rest are its arguments
+if [ -z "$1" ]; then
+    echo "Usage: $0 <command> [args...]"
+    exit 1
+fi
+
+command="$1"
+args="${@:2}"
+sudo $(which "$command") $args
