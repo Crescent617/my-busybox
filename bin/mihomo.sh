@@ -10,9 +10,9 @@ config_tmpl=$(
 port: 7890
 socks-port: 7891
 redir-port: 7892
-allow-lan: false
+allow-lan: true
 mode: rule
-log-level: silent
+log-level: warning
 external-controller: '0.0.0.0:9090'
 secret: ''
 external-ui: /home/hrli/.config/mihomo/ui
@@ -63,6 +63,8 @@ download_ui() {
   if [ ! -d "${ui_dir}" ]; then
     echo "[+] 下载 UI..."
     git clone https://github.com/metacubex/metacubexd.git -b gh-pages --depth 1 "${ui_dir}"
+  else
+    echo "[+] UI 已存在，跳过下载"
   fi
 }
 
@@ -81,33 +83,59 @@ download_mmdb() {
   fi
 }
 
+system-proxy-open() {
+  # 跳过 localhost 相关流量，避免死循环
+  sudo iptables -t nat -A OUTPUT -d 127.0.0.1 -j RETURN
+
+  # 跳过本地代理程序（比如 mihomo）的进程流量（假设 UID 为 123）
+  # sudo iptables -t nat -A OUTPUT -m owner --uid-owner 123 -j RETURN
+
+  # 重定向其他 TCP 流量到 redir 端口
+  sudo iptables -t nat -A OUTPUT -p tcp -j REDIRECT --to-ports 7892
+}
+
+system-proxy-close() {
+  # 清除之前的规则
+  sudo iptables -t nat -F OUTPUT
+  sudo iptables -t nat -F PREROUTING
+}
+
 # Main function to start the script
 run() {
   echo "[+] 启动 mihomo..."
   mihomo -d "${MIHOMO_DIR}"
 }
 
-arg1="${1:-}"
-case "${arg1}" in
-run)
-  run
-  ;;
-download_config)
-  download_config $CLASH_SUB_URL
-  ;;
-download_ui)
-  download_ui
-  ;;
-download_mmdb)
-  download_mmdb
-  ;;
-init)
-  download_config $CLASH_SUB_URL
-  download_ui
-  download_mmdb
-  ;;
-*)
-  echo "Usage: $0 {init|run|download_config|download_ui|download_mmdb}"
-  exit 1
-  ;;
-esac
+while getopts "D:P:R" opt; do
+  case "$opt" in
+  D) # Download
+    case "$OPTARG" in
+    config) download_config $CLASH_SUB_URL ;;
+    ui) download_ui ;;
+    mmdb) download_mmdb ;;
+    all)
+      download_config $CLASH_SUB_URL
+      download_ui
+      download_mmdb
+      ;;
+    *) echo "无效选项: -D $OPTARG" ;;
+    esac
+    ;;
+  P) # System Proxy
+    case "$OPTARG" in
+    o)
+      system-proxy-open
+      ;;
+    c)
+      system-proxy-close
+      ;;
+    *)
+      echo "无效选项: -P $OPTARG"
+      ;;
+    esac
+    ;;
+  R) # Run
+    run
+    ;;
+  esac
+done

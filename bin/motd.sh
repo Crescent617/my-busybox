@@ -74,7 +74,7 @@ fi
 if cmd_exists todo.sh; then
   # keep lines start with number
   title=$(mark_cyan "  TODO")
-  todos="$(todo.sh list | awk '/^\x1b\[[0-9;]*m*[0-9]/')"
+  todos="$(todo.sh list | awk '/^(\x1b\[)?[0-9;]*m*[0-9]/')"
   if [ -z "$todos" ]; then
     todos="Nice! No todos today. 🤪"
   fi
