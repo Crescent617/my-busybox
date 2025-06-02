@@ -2,6 +2,9 @@
 
 # example: source proxy-toggle.sh
 
+default_proxy='http://localhost:7890'
+proxy=${MY_PROXY:-$default_proxy}
+
 if [[ -n $http_proxy ]]; then
   echo 'disable http_proxy'
   unset http_proxy
@@ -13,7 +16,6 @@ if [[ -n $http_proxy ]]; then
   unset NO_PROXY
 else
   echo 'enable http_proxy'
-  proxy='http://localhost:7890'
 
   export http_proxy=$proxy
   export https_proxy=$proxy
