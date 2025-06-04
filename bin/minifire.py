@@ -1,5 +1,6 @@
 import argparse
 import inspect
+from typing import Literal, get_origin
 
 def fire_like(obj):
     parser = argparse.ArgumentParser()
@@ -44,10 +45,17 @@ def add_args_from_sig(parser, sig, skip_self=False):
     for name, param in sig.parameters.items():
         if skip_self and name == 'self':
             continue
+
         param_type = param.annotation if param.annotation != inspect.Parameter.empty else str
+
         default = param.default if param.default != inspect.Parameter.empty else None
+
         arg_name = f"--{name.replace('_', '-')}"
+
         if param_type == bool:
             parser.add_argument(arg_name, action='store_true' if default is False else 'store_false')
+        elif get_origin(param_type) is Literal:
+            choices = [v for v in param_type.__args__ if v is not None] # type: ignore
+            parser.add_argument(arg_name, type=str, choices=choices, default=default)
         else:
             parser.add_argument(arg_name, type=param_type, default=default)
