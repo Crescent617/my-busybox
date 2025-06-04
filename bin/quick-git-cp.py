@@ -162,9 +162,9 @@ if __name__ == "__main__":
 
     if create_new_branch:
         if args.from_pr:
-            new_branch_name = f'cp-from-pr-{args.from_pr}-onto-{onto_branch}-{time.strftime("%Y%m%d%H%M%S")}'
+            new_branch_name = f"cp-from-pr-{args.from_pr}-onto-{onto_branch}-{time.strftime('%Y%m%d%H%M%S')}"
         else:
-            new_branch_name = f'{branch_name}-cp{num}-onto-{onto_branch}-{time.strftime("%Y%m%d%H%M%S")}'
+            new_branch_name = f"{branch_name}-cp{num}-onto-{onto_branch}-{time.strftime('%Y%m%d%H%M%S')}"
         git_create_branch(new_branch_name.replace("/", "_"))
 
     git_cherry_pick(*commits)

@@ -10,7 +10,7 @@ def list_panes():
             "list-panes",
             "-a",
             "-F",
-            '#S:#I:#W - "#T" #{session_alerts}' "(#{?pane_pipe,piped,not piped})",
+            '#S:#I:#W - "#T" #{session_alerts}(#{?pane_pipe,piped,not piped})',
         ],
         stdout=subprocess.PIPE,
     )
