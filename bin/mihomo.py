@@ -22,28 +22,70 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-MIHOMO_DIR = Path.home() / ".config" / "mihomo"
-MIHOMO_DIR.mkdir(parents=True, exist_ok=True)
-MIHOMO_CTL_HOST = "0.0.0.0:9090"
+if d := os.getenv("MIHOMO_DIR"):
+    MIHOMO_DIR = Path(d)
+else:
+    MIHOMO_DIR = Path.home() / ".config" / "mihomo"
+    MIHOMO_DIR.mkdir(parents=True, exist_ok=True)
 
 # Clash 配置
-CLASH_HOST = "http://" + MIHOMO_CTL_HOST  # Clash 控制地址
+CLASH_HOST = "http://0.0.0.0:9090"  # Clash 控制台地址
 SECRET = ""  # 如果有 secret，填入，比如 "abc123"
 PROXY_SELECTOR = re.compile(r"香港|新加坡|台湾|日本")
 TARGET_GROUP = "🔰国外流量"
 
 
-CONFIG_TMPL = """\
+DEFAULT_CONFIG = """
 port: 7890
 socks-port: 7891
-redir-port: 7892
+# redir-port: 7892
 allow-lan: true
 mode: rule
 log-level: warning
-external-controller: '{ex_ctl_host}'
+# log-level: info
+external-controller: '0.0.0.0:9090'
 secret: ''
-external-ui: {ui_path}
-""".format(ui_path=MIHOMO_DIR / "ui", ex_ctl_host=MIHOMO_CTL_HOST)
+
+tun:
+  enable: true
+  stack: system  # system / gvisor，mac 上推荐 system
+  dns-hijack:
+    - any:53
+    - tcp://any:53
+  auto-route: true      # 自动配置路由
+  auto-detect-interface: true
+
+dns:
+  enable: true
+  listen: 0.0.0.0:53
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter:
+    - '*.local'
+    - 'localhost'
+    - 'dns.google'
+    - '+.lan'
+    - '+.internal'
+    - 'time.*'
+  nameserver:
+    - https://doh.pub/dns-query
+    - https://dns.alidns.com/dns-query
+  fallback:
+    - https://1.1.1.1/dns-query
+  fallback-filter:
+    geoip: true
+    geoip-code: CN
+    # geosite:
+    #   - gfw
+    ipcidr:
+      - 240.0.0.0/4
+    domain:
+      - '+.google.com'
+      - '+.facebook.com'
+      - '+.youtube.com'
+
+external-ui: ui
+"""
 
 required_cmds = ["mihomo", "yq", "git"]
 
@@ -66,8 +108,9 @@ def download_config(sub_url: str):
 
     sub_config = MIHOMO_DIR / "sub.yaml"
     config_file = MIHOMO_DIR / "config.yaml"
-    tmp_config = Path(tempfile.gettempdir()) / "mihomo_default.yaml"
-    tmp_config.write_text(CONFIG_TMPL)
+    default_config = MIHOMO_DIR / "config_default.yaml"
+    if not default_config.exists():
+        default_config.write_text(DEFAULT_CONFIG)
 
     try:
         urllib.request.urlretrieve(sub_url, sub_config)
@@ -86,7 +129,7 @@ def download_config(sub_url: str):
 
     logger.info("合并配置文件...")
     merged_yaml = run_cmd(
-        f"yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' {sub_config} {tmp_config}"
+        f"yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' {sub_config} {default_config}"
     )
     config_file.write_text(merged_yaml)
 
@@ -190,7 +233,7 @@ class Cli:
     def __init__(self, sub_url: str = ""):
         self.sub_url = sub_url
 
-    def download(self, project: Literal["config", "ui", "mmdb", "all"]):
+    def download(self, file: Literal["config", "ui", "mmdb", "all"]):
         """下载配置、UI 或 mmdb 文件"""
 
         sub_url = self.sub_url or os.getenv("CLASH_SUB_URL")
@@ -202,7 +245,7 @@ class Cli:
             "mmdb": download_mmdb,
             "all": lambda: (download_config(sub_url), download_ui(), download_mmdb()),
         }
-        actions[project]()
+        actions[file]()
 
     def run(self):
         """运行 Mihomo"""
@@ -237,4 +280,8 @@ class Cli:
 
 
 if __name__ == "__main__":
-    fire_like(Cli)
+    try:
+        fire_like(Cli)
+    except Exception as e:
+        logger.error(f"发生错误: {str(e)[:50]}")
+        sys.exit(1)
