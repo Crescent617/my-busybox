@@ -48,13 +48,15 @@ secret: ''
 
 tun:
   enable: true
-  stack: system  # system / gvisor，mac 上推荐 system
+  stack: system # system / gvisor，mac 上推荐 system
   dns-hijack:
     - any:53
     - tcp://any:53
-  auto-route: true      # 自动配置路由
+  auto-route: true # 自动配置路由
   auto-detect-interface: true
-
+  route-exclude-address:
+    - 100.64.0.0/10
+    - fd7a:115c:a1e0::/48
 dns:
   enable: true
   listen: 0.0.0.0:53
@@ -67,6 +69,10 @@ dns:
     - '+.lan'
     - '+.internal'
     - 'time.*'
+    - "*.tailscale.com"
+    - "tailscale.com"
+    - "log.tailscale.net"
+    - "ts.net" # Tailscale 的短域名
   nameserver:
     - https://doh.pub/dns-query
     - https://dns.alidns.com/dns-query
@@ -83,8 +89,19 @@ dns:
       - '+.google.com'
       - '+.facebook.com'
       - '+.youtube.com'
-
+  nameserver-policy:
+    "+.<tailnet-name>.ts.net": "100.100.100.100"
 external-ui: ui
+"""
+
+CUSTOM_RULES = """
+rules:
+  # {{tailscale
+  - PROCESS-NAME,tailscale,DIRECT
+  - PROCESS-NAME,tailscaled,DIRECT
+  - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
+  - IP-CIDR,fd7a:115c:a1e0::/48,DIRECT,no-resolve  # Tailscale IPv6
+  # }}
 """
 
 required_cmds = ["mihomo", "yq", "git"]
@@ -111,6 +128,9 @@ def download_config(sub_url: str):
     default_config = MIHOMO_DIR / "config_default.yaml"
     if not default_config.exists():
         default_config.write_text(DEFAULT_CONFIG)
+    rules_file = MIHOMO_DIR / "config_with_rules.yaml"
+    if not rules_file.exists():
+        rules_file.write_text(DEFAULT_CONFIG + "\n" + CUSTOM_RULES)
 
     try:
         urllib.request.urlretrieve(sub_url, sub_config)
@@ -129,7 +149,7 @@ def download_config(sub_url: str):
 
     logger.info("合并配置文件...")
     merged_yaml = run_cmd(
-        f"yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' {sub_config} {default_config}"
+        f"yq eval-all 'select(fi == 0) *+ select(fi == 1) * select(fi == 2)' {rules_file} {sub_config} {default_config}"
     )
     config_file.write_text(merged_yaml)
 
@@ -229,14 +249,28 @@ def switch_proxy(proxy_name: str):
     logger.info(f"✅ 已切换到节点：{proxy_name}")
 
 
+def load_json(file_path: Path):
+    """加载 JSON 文件"""
+    if not file_path.exists():
+        logger.error(f"文件不存在: {file_path}")
+        return {}
+    with open(file_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
 class Cli:
-    def __init__(self, sub_url: str = ""):
+    def __init__(self, sub_url: str = "", dir=MIHOMO_DIR):
         self.sub_url = sub_url
+        self.mihomo_dir = Path(dir).expanduser()
 
     def download(self, file: Literal["config", "ui", "mmdb", "all"]):
         """下载配置、UI 或 mmdb 文件"""
 
-        sub_url = self.sub_url or os.getenv("CLASH_SUB_URL")
+        sub_url = (
+            self.sub_url
+            or load_json(self.mihomo_dir / "subconfig.json").get("sub_url")
+            or os.getenv("CLASH_SUB_URL")
+        )
         if not sub_url:
             raise ValueError("请设置环境变量 CLASH_SUB_URL")
         actions = {
@@ -250,7 +284,7 @@ class Cli:
     def run(self):
         """运行 Mihomo"""
         logger.info("启动 mihomo...")
-        run_cmd(f"mihomo -d {MIHOMO_DIR}")
+        run_cmd(f"mihomo -d {self.mihomo_dir}")
 
     def healthcheck(self):
         """检查依赖"""
