@@ -73,6 +73,9 @@ dns:
     - "tailscale.com"
     - "log.tailscale.net"
     - "ts.net" # Tailscale 的短域名
+  default-nameserver:
+    - 8.8.8.8 # Google DNS
+    - 1.1.1.1 # Cloudflare DNS
   nameserver:
     - https://doh.pub/dns-query
     - https://dns.alidns.com/dns-query
