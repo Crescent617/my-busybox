@@ -28,84 +28,12 @@ else:
     MIHOMO_DIR = Path.home() / ".config" / "mihomo"
     MIHOMO_DIR.mkdir(parents=True, exist_ok=True)
 
-# Clash 配置
+DEFAULT_CONFIG = (Path(__file__).parent / "data" / "mihomo_default.yaml").read_text()
+CUSTOM_RULES = (Path(__file__).parent / "data" / "mihomo_rules.yaml").read_text()
 CLASH_HOST = "http://0.0.0.0:9090"  # Clash 控制台地址
 SECRET = ""  # 如果有 secret，填入，比如 "abc123"
 PROXY_SELECTOR = re.compile(r"香港|新加坡|台湾|日本")
 TARGET_GROUP = "🔰国外流量"
-
-
-DEFAULT_CONFIG = """
-port: 7890
-socks-port: 7891
-# redir-port: 7892
-allow-lan: true
-mode: rule
-log-level: warning
-# log-level: info
-external-controller: '0.0.0.0:9090'
-secret: ''
-
-tun:
-  enable: true
-  stack: system # system / gvisor，mac 上推荐 system
-  dns-hijack:
-    - any:53
-    - tcp://any:53
-  auto-route: true # 自动配置路由
-  auto-detect-interface: true
-  route-exclude-address:
-    - 100.64.0.0/10
-    - fd7a:115c:a1e0::/48
-dns:
-  enable: true
-  listen: 0.0.0.0:53
-  enhanced-mode: fake-ip
-  fake-ip-range: 198.18.0.1/16
-  fake-ip-filter:
-    - '*.local'
-    - 'localhost'
-    - 'dns.google'
-    - '+.lan'
-    - '+.internal'
-    - 'time.*'
-    - "*.tailscale.com"
-    - "tailscale.com"
-    - "log.tailscale.net"
-    - "ts.net" # Tailscale 的短域名
-  default-nameserver:
-    - 8.8.8.8 # Google DNS
-    - 1.1.1.1 # Cloudflare DNS
-  nameserver:
-    - https://doh.pub/dns-query
-    - https://dns.alidns.com/dns-query
-  fallback:
-    - https://1.1.1.1/dns-query
-  fallback-filter:
-    geoip: true
-    geoip-code: CN
-    # geosite:
-    #   - gfw
-    ipcidr:
-      - 240.0.0.0/4
-    domain:
-      - '+.google.com'
-      - '+.facebook.com'
-      - '+.youtube.com'
-  nameserver-policy:
-    "+.<tailnet-name>.ts.net": "100.100.100.100"
-external-ui: ui
-"""
-
-CUSTOM_RULES = """
-rules:
-  # {{tailscale
-  - PROCESS-NAME,tailscale,DIRECT
-  - PROCESS-NAME,tailscaled,DIRECT
-  - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
-  - IP-CIDR,fd7a:115c:a1e0::/48,DIRECT,no-resolve  # Tailscale IPv6
-  # }}
-"""
 
 required_cmds = ["mihomo", "yq", "git"]
 
@@ -129,8 +57,6 @@ def download_config(sub_url: str):
     config_file = MIHOMO_DIR / "config.yaml"
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        logger.info(f"临时目录: {temp_dir}")
-
         p = Path(temp_dir)
 
         sub_config = p / "sub.yaml"

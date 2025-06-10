@@ -18,12 +18,19 @@ uid() {
   echo "$(id -u)"
 }
 
+ONLY_ALIVE="0"
+
 # 参数解析
 while [[ $# -gt 0 ]]; do
   case "$1" in
   --scope)
     SCOPE="$2"
     shift 2
+    ;;
+  --alive)
+    echo "Only showing alive services"
+    ONLY_ALIVE="1"
+    shift
     ;;
   *)
     echo "Unknown option: $1"
@@ -41,7 +48,11 @@ fi
 # 如果是 system scope 且当前不是 root，则用 sudo 重新执行
 if [[ "$SCOPE" == "system" && "$EUID" -ne 0 ]]; then
   echo "Elevating to root for system scope..."
-  exec sudo "$0" --scope system
+  args="--scope system"
+  if [[ "$ONLY_ALIVE" == "1" ]]; then
+    args+=" --alive"
+  fi
+  exec sudo "$0" $args
 fi
 
 # 设置 launchctl domain
@@ -51,8 +62,15 @@ else
   DOMAIN="system"
 fi
 
-# 获取服务列表
-SERVICES=$(launchctl list | awk 'NR>1 {print $3}' | sort | uniq)
+cond=''
+if [[ "$ONLY_ALIVE" == "1" ]]; then
+  cond='$1 != "-"'
+  echo "Only showing alive services in scope [$SCOPE]"
+else
+  cond='1 == 1'
+fi
+
+SERVICES=$(launchctl list | awk 'NR>1 && '"$cond"' {printf "%-50s\t %s\t %s\n", $3, $1, $2}' | sort -r | uniq)
 
 if [ -z "$SERVICES" ]; then
   echo "No launchctl services found in scope [$SCOPE]"
@@ -60,7 +78,7 @@ if [ -z "$SERVICES" ]; then
 fi
 
 # 选择服务
-SELECTED=$(echo "$SERVICES" | fzf --prompt="[$SCOPE] Select a service: ")
+SELECTED=$(echo "$SERVICES" | fzf --prompt="[$SCOPE] Select a service: " | awk '{print $1}')
 
 if [ -z "$SELECTED" ]; then
   echo "No service selected."
