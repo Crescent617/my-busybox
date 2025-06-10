@@ -123,35 +123,40 @@ def download_config(sub_url: str):
 
     logger.info("下载订阅中...")
 
-    sub_config = MIHOMO_DIR / "sub.yaml"
     config_file = MIHOMO_DIR / "config.yaml"
-    default_config = MIHOMO_DIR / "config_default.yaml"
-    if not default_config.exists():
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        logger.info(f"临时目录: {temp_dir}")
+
+        p = Path(temp_dir)
+
+        sub_config = p / "sub.yaml"
+        default_config = p / "config_default.yaml"
+        rules_file = p / "rules.yaml"
+
         default_config.write_text(DEFAULT_CONFIG)
-    rules_file = MIHOMO_DIR / "config_with_rules.yaml"
-    if not rules_file.exists():
-        rules_file.write_text(DEFAULT_CONFIG + "\n" + CUSTOM_RULES)
+        rules_file.write_text(CUSTOM_RULES)
 
-    try:
-        urllib.request.urlretrieve(sub_url, sub_config)
-    except Exception as e:
-        logger.error(f"下载订阅失败: {e}")
-        sys.exit(1)
+        try:
+            urllib.request.urlretrieve(sub_url, sub_config)
+        except Exception as e:
+            logger.error(f"下载订阅失败: {e}")
+            sys.exit(1)
 
-    # 检查是否有 proxies 字段
-    try:
-        output = run_cmd(f"yq -r '.proxies' {sub_config}")
-        if not output:
-            raise Exception("proxies 字段为空")
-    except Exception as e:
-        logger.error(f"解析订阅失败或无 proxies: {e}")
-        sys.exit(1)
+        # 检查是否有 proxies 字段
+        try:
+            output = run_cmd(f"yq -r '.proxies' {sub_config}")
+            if not output:
+                raise Exception("订阅 proxies 字段为空")
+        except Exception as e:
+            logger.error(f"解析订阅失败或无 proxies: {e}")
+            sys.exit(1)
 
-    logger.info("合并配置文件...")
-    merged_yaml = run_cmd(
-        f"yq eval-all 'select(fi == 0) *+ select(fi == 1) * select(fi == 2)' {rules_file} {sub_config} {default_config}"
-    )
-    config_file.write_text(merged_yaml)
+        logger.info("合并配置文件...")
+        merged_yaml = run_cmd(
+            f"yq eval-all 'select(fi == 0) *+ select(fi == 1) * select(fi == 2)' {rules_file} {sub_config} {default_config}"
+        )
+        config_file.write_text(merged_yaml)
 
 
 def download_ui():
