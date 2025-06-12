@@ -12,6 +12,7 @@ external-ui: ui
 tun:
   enable: true
   stack: system # system / gvisor，mac 上推荐 system
+  device: utun233 # 设备名称
   dns-hijack:
     - any:53
     - tcp://any:53
