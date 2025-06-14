@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 mark_red() {
   echo -e "\033[0;31m$1\033[0m"
