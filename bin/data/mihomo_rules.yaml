@@ -1,7 +1,6 @@
 rules:
   # {{tailscale
-  - PROCESS-NAME,tailscale,DIRECT
-  - PROCESS-NAME,tailscaled,DIRECT
+  - PROCESS-NAME-REGEX,.*tailscale.*,DIRECT
   - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
   - IP-CIDR,fd7a:115c:a1e0::/48,DIRECT,no-resolve  # Tailscale IPv6
   # }}

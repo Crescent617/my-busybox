@@ -215,6 +215,10 @@ class Cli:
         }
         actions[file]()
 
+    def update_sub(self):
+        """更新订阅"""
+        self.download("config")
+
     def run(self):
         """运行 Mihomo"""
         logger.info("启动 mihomo...")
@@ -232,7 +236,7 @@ class Cli:
         """切换代理节点"""
         proxies = get_proxies()
 
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=4) as executor:
             futures = {executor.submit(get_delay, proxy): proxy for proxy in proxies}
             delays = {future.result(): proxy for future, proxy in futures.items()}
             if delays and auto:
