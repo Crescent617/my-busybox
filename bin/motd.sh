@@ -48,7 +48,7 @@ os_logo() {
 }
 
 # ==== System Information ====
-# fastfetch --logo small -s "break:os:cpu:gpu:memory:disk:uptime" 2>/dev/null
+fastfetch --logo small -s "Title:Separator:OS:CPU:GPU:LocalIP:Uptime" 2>/dev/null
 # if [ $? -ne 0 ]; then
 #   mark_blue "$(os_logo) $(uptime)"
 # fi

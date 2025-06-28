@@ -10,6 +10,7 @@ if [[ -n $http_proxy ]]; then
   unset http_proxy
   unset https_proxy
   unset no_proxy
+  unset all_proxy
 
   unset HTTP_PROXY
   unset HTTPS_PROXY
@@ -19,6 +20,7 @@ else
 
   export http_proxy=$proxy
   export https_proxy=$proxy
+  export all_proxy=$proxy
   export no_proxy="localhost, 127.0.0.1, ::1"
 
   export HTTP_PROXY=$proxy
