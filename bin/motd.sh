@@ -52,7 +52,7 @@ fastfetch --logo small -s "Title:Separator:OS:CPU:GPU:LocalIP:Uptime" 2>/dev/nul
 # if [ $? -ne 0 ]; then
 #   mark_blue "$(os_logo) $(uptime)"
 # fi
-# echo ""
+echo ""
 
 # ==== Package Updates ====
 if cmd_exists checkupdates; then
