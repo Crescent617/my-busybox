@@ -5,4 +5,6 @@ rules:
   - IP-CIDR,fd7a:115c:a1e0::/48,DIRECT,no-resolve  # Tailscale IPv6
   # }}
   - DOMAIN-SUFFIX,githubcopilot.com,DIRECT
+  - DOMAIN-SUFFIX,kimi.team,DIRECT
+  - DOMAIN-SUFFIX,msh.team,DIRECT
   # - DOMAIN-SUFFIX,microsoft.com,DIRECT

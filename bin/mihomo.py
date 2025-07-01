@@ -16,26 +16,25 @@ from typing import Literal
 
 from minifire import fire_like
 
+# ==== CONFIG ====
+PROXY_SELECTOR = re.compile(r"香港|新加坡|台湾|日本")
+TARGET_GROUP = "🔰国外流量"
+
+# ==== LOGGING ====
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-if d := os.getenv("MIHOMO_DIR"):
-    MIHOMO_DIR = Path(d)
-else:
-    MIHOMO_DIR = Path.home() / ".config" / "mihomo"
-    MIHOMO_DIR.mkdir(parents=True, exist_ok=True)
-
+# ==== CONSTANTS ====
+MIHOMO_DIR = Path(os.getenv("MIHOMO_DIR") or "~/.config/mihomo").expanduser()
+MIHOMO_DIR.mkdir(parents=True, exist_ok=True)
 DEFAULT_CONFIG = (Path(__file__).parent / "data" / "mihomo_default.yaml").read_text()
 CUSTOM_RULES = (Path(__file__).parent / "data" / "mihomo_rules.yaml").read_text()
 CLASH_HOST = "http://0.0.0.0:9090"  # Clash 控制台地址
 SECRET = ""  # 如果有 secret，填入，比如 "abc123"
-PROXY_SELECTOR = re.compile(r"香港|新加坡|台湾|日本")
-TARGET_GROUP = "🔰国外流量"
-
-required_cmds = ["mihomo", "yq", "git"]
+REQUIRED_EXE = ["mihomo", "yq", "git"]
 
 
 def run_cmd(cmd: str, check=True):
@@ -194,17 +193,17 @@ def load_json(file_path: Path):
 
 class Cli:
     def __init__(self, sub_url: str = "", dir=MIHOMO_DIR):
-        self.sub_url = sub_url
         self.mihomo_dir = Path(dir).expanduser()
+        self.sub_url = (
+            sub_url
+            or load_json(self.mihomo_dir / "subconfig.json").get("sub_url")
+            or os.getenv("CLASH_SUB_URL")
+        )
 
     def download(self, file: Literal["config", "ui", "mmdb", "all"]):
         """下载配置、UI 或 mmdb 文件"""
 
-        sub_url = (
-            self.sub_url
-            or load_json(self.mihomo_dir / "subconfig.json").get("sub_url")
-            or os.getenv("CLASH_SUB_URL")
-        )
+        sub_url = self.sub_url
         if not sub_url:
             raise ValueError("请设置环境变量 CLASH_SUB_URL")
         actions = {
@@ -227,7 +226,7 @@ class Cli:
     def healthcheck(self):
         """检查依赖"""
         logger.info("所有依赖已满足")
-        missing_cmds = [cmd for cmd in required_cmds if not shutil.which(cmd)]
+        missing_cmds = [cmd for cmd in REQUIRED_EXE if not shutil.which(cmd)]
         if missing_cmds:
             logger.error(f"缺少依赖: {', '.join(missing_cmds)}")
             sys.exit(1)
