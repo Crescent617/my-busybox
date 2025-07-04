@@ -10,34 +10,33 @@ mihomo.py 是一个无任何第三方py包依赖 Python 脚本，用于管理 Cl
 
 依赖项：
 - yq 和 git: 用于 YAML 合并及 UI 下载。
+- subconverter: 用于处理 Clash 订阅转换。(可选，但推荐安装)
+  - 可以自动处理定时切换，Common Rules
 
 使用方法：
-请确保设置环境变量 `CLASH_SUB_URL` 或在命令行中指定订阅 URL。
+请确保设置环境变量 `CLASH_SUB_URL` 或在命令行中指定订阅 URL，又或者在Mihomo 目录下创建 `sub.txt` 文件，内容为订阅 URL。
 运行脚本时：
 `python3 mihomo.py <commands>`
 您可以通过以下命令来查看支持的全部功能：
 `python3 mihomo.py --help`
 """
 
-import json
 import logging
 import os
-import re
 import subprocess
 import sys
 import tempfile
-import urllib.parse
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Literal
 
 from minifire import fire_like
 
-# ==== 配置部分 ====
-PROXY_SELECTOR = re.compile(r"香港|新加坡|台湾|日本")  # 代理节点选择规则
-TARGET_GROUP = "🔰国外流量"  # Clash 策略组名称
-TEST_DELAY_URL = "http://google.com"  # 用于测试代理节点延迟的 URL
+# ==== 常量定义 ====
+MIHOMO_DIR = Path(os.getenv("MIHOMO_DIR") or "~/.config/mihomo").expanduser()
+MIHOMO_DIR.mkdir(parents=True, exist_ok=True)  # 创建配置目录
+DEFAULT_CONFIG = (Path(__file__).parent / "data" / "mihomo_default.yaml").read_text()
+CUSTOM_RULES = (Path(__file__).parent / "data" / "mihomo_rules.yaml").read_text()
 
 # ==== 日志设置 ====
 logging.basicConfig(
@@ -46,13 +45,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ==== 常量定义 ====
-MIHOMO_DIR = Path(os.getenv("MIHOMO_DIR") or "~/.config/mihomo").expanduser()
-MIHOMO_DIR.mkdir(parents=True, exist_ok=True)  # 创建配置目录
-DEFAULT_CONFIG = (Path(__file__).parent / "data" / "mihomo_default.yaml").read_text()
-CUSTOM_RULES = (Path(__file__).parent / "data" / "mihomo_rules.yaml").read_text()
-CLASH_HOST = "http://0.0.0.0:9090"  # Clash 控制台地址
-SECRET = ""  # Clash 的 API 密钥，如果需要，请填写。
 
 # ==== 函数定义 ====
 def run_cmd(cmd: str, check=True):
@@ -63,6 +55,7 @@ def run_cmd(cmd: str, check=True):
         logger.error(result.stderr)
         sys.exit(1)
     return result.stdout.strip()
+
 
 def download_config(sub_url: str):
     """下载订阅配置并合并为 Clash 的配置文件"""
@@ -108,6 +101,7 @@ def download_config(sub_url: str):
         )
         config_file.write_text(merged_yaml)
 
+
 def download_ui():
     """下载 UI 组件"""
     ui_dir = MIHOMO_DIR / "ui"
@@ -118,6 +112,7 @@ def download_ui():
     run_cmd(
         f"git clone https://github.com/metacubex/metacubexd.git -b gh-pages --depth 1 {ui_dir}"
     )
+
 
 def download_mmdb():
     """下载 MaxMind MMDB 文件"""
@@ -141,76 +136,15 @@ def download_mmdb():
             sys.exit(1)
     os.rename(temp_path, mmdb_path)
 
-# 构造带 secret 的 URL
-def build_url(path, query=None):
-    base = urllib.parse.urljoin(CLASH_HOST, path)
-    query = query or {}
-    if SECRET:
-        query["secret"] = SECRET
-    if query:
-        return f"{base}?{urllib.parse.urlencode(query)}"
-    return base
-
-# 发送 GET 请求并返回 JSON
-def http_get_json(url):
-    req = urllib.request.Request(url)
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        return json.loads(resp.read().decode())
-
-# 发送 PUT 请求
-def http_put_json(url, data):
-    body = json.dumps(data).encode()
-    req = urllib.request.Request(url, data=body, method="PUT")
-    req.add_header("Content-Type", "application/json")
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        return resp.read().decode()
-
-# 获取策略组下的所有节点名
-def get_proxies():
-    url = build_url("/proxies")
-    data = http_get_json(url)
-    proxies: dict[str, dict] = data.get("proxies", [])
-    targets = []
-
-    for name, proxy in proxies.items():
-        if proxy.get("id") and proxy.get("name") and PROXY_SELECTOR.search(name):
-            targets.append(proxy["name"])
-    return targets
-
-# 测试某个节点的延迟
-def test_delay(proxy_name: str):
-    encoded = urllib.parse.quote(proxy_name.encode(), safe="")
-    url = build_url(
-        f"/proxies/{encoded}/delay",
-        {"timeout": 5000, "url": TEST_DELAY_URL},
-    )
-    try:
-        data = http_get_json(url)
-        return data.get("delay", float("inf"))
-    except:
-        return float("inf")
-
-# 切换策略组使用的节点
-def switch_proxy(proxy_name: str):
-    encoded = urllib.parse.quote(TARGET_GROUP, safe="")
-    url = build_url(f"/proxies/{encoded}")
-    http_put_json(url, {"name": proxy_name})
-    logger.info(f"✅ 已切换到节点：{proxy_name}")
-
-def load_json(file_path: Path):
-    """加载 JSON 文件"""
-    if not file_path.exists():
-        return {}
-    with open(file_path, "r", encoding="utf-8") as f:
-        return json.load(f)
 
 class Cli:
     """CLI 命令行控制类"""
+
     def __init__(self, sub_url: str = "", dir=MIHOMO_DIR):
         self.mihomo_dir = Path(dir).expanduser()
         self.sub_url = (
             sub_url
-            or load_json(self.mihomo_dir / "subconfig.json").get("sub_url")
+            or Path(self.mihomo_dir / "sub.txt").read_text().strip()
             or os.getenv("CLASH_SUB_URL")
         )
 
@@ -236,33 +170,6 @@ class Cli:
         """运行 Mihomo"""
         logger.info("启动 mihomo...")
         run_cmd(f"mihomo -d {self.mihomo_dir}")
-
-    def proxy(self, show: bool = False, auto: bool = False):
-        """切换代理节点"""
-        proxies = get_proxies()
-
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            futures = {executor.submit(test_delay, proxy): proxy for proxy in proxies}
-            delays = {future.result(): proxy for future, proxy in futures.items()}
-            if delays and auto:
-                min_delay = min(delays.keys())
-                best_proxy = delays[min_delay]
-                logger.info(f"最佳节点: {best_proxy} (延迟: {min_delay} ms)")
-                switch_proxy(best_proxy)
-
-            elif show:
-                logger.info("可用节点列表:")
-                for d, proxy in sorted(delays.items()):
-                    logger.info(f"{proxy} - 延迟: {d} ms")
-
-    def healthcheck(self):
-        req = urllib.request.Request(TEST_DELAY_URL)
-        try:
-            urllib.request.urlopen(req, timeout=10)
-            logger.info("ping 测试成功，网络连接正常")
-        except Exception as e:
-            logger.error(f"ping 失败: {e}... 尝试切换代理")
-            self.proxy(auto=True)
 
 
 if __name__ == "__main__":
