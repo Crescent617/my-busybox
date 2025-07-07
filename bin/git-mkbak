@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+# git-mkbak - Create a backup branch in a Git repository for the current branch.
+
+# parse opts -f
+force=false
+while getopts "f" opt; do
+    case $opt in
+    f)
+        force=true
+        ;;
+    *)
+        echo "Usage: $0 [-f]"
+        exit 1
+        ;;
+    esac
+done
+
+cur_branch=$(git rev-parse --abbrev-ref HEAD)
+if [ -z "$cur_branch" ]; then
+    echo "Error: Not in a Git repository or unable to determine current branch."
+    exit 1
+fi
+
+bak_branch="$cur_branch-bak"
+# Check if the backup branch already exists
+existing_branch=$(git branch --list "$bak_branch")
+
+if [ -n "$existing_branch" ]; then
+    if [ "$force" = true ]; then
+        echo "Warning: Backup branch '$bak_branch' already exists. Forcing creation of a new backup branch."
+        git branch -D "$bak_branch" || {
+            echo "Error: Failed to delete existing backup branch '$bak_branch'."
+            exit 1
+        }
+    else
+        echo "Error: Backup branch '$bak_branch' already exists. Use -f to force creation of a new backup branch."
+        exit 1
+    fi
+fi
+
+git checkout -b "$bak_branch" || {
+    echo "Error: Failed to create backup branch '$bak_branch'."
+    exit 1
+}
+
+echo "Backup branch '$bak_branch' created successfully from '$cur_branch'."
+
+git checkout "$cur_branch" || {
+    echo "Error: Failed to switch back to the original branch '$cur_branch'."
+    exit 1
+}
