@@ -1,0 +1,220 @@
+# This is a template for mihomo, a Clash configuration file.
+# It includes settings for tun, dns, proxy providers, proxy groups, and rule providers.
+# You need to replace the **proxy-providers** and **proxy-groupssections** with your own configurations.
+port: 7890
+socks-port: 7891
+# redir-port: 7892
+allow-lan: true
+mode: rule
+log-level: warning
+# log-level: info
+external-controller: '0.0.0.0:9090'
+secret: ''
+external-ui: ui
+
+tun:
+  enable: true
+  stack: system # system / gvisor，mac 上推荐 system
+  device: utun233 # 设备名称
+  dns-hijack:
+    - any:53
+    - tcp://any:53
+  auto-route: true # 自动配置路由
+  # auto-route-ipv6: false
+  auto-detect-interface: true
+  route-exclude-address:
+    - 100.64.0.0/10 # Tailscale
+    - fd7a:115c:a1e0::/48
+    - 173.245.48.0/20 # Cloudflare https://www.cloudflare-cn.com/ips/
+    - 103.21.244.0/22
+    - 103.22.200.0/22
+    - 103.31.4.0/22
+    - 141.101.64.0/18
+    - 108.162.192.0/18
+    - 190.93.240.0/20
+    - 188.114.96.0/20
+    - 197.234.240.0/22
+    - 198.41.128.0/17
+    - 162.158.0.0/15
+    - 104.16.0.0/13
+    - 104.24.0.0/14
+    - 172.64.0.0/13
+    - 131.0.72.0/22
+    - 2400:cb00::/32
+    - 2606:4700::/32
+    - 2803:f800::/32
+    - 2405:b500::/32
+    - 2405:8100::/32
+    - 2a06:98c0::/29
+    - 2c0f:f248::/32 
+dns:
+  enable: true
+  ipv6: true
+  listen: 0.0.0.0:53
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter:
+    - '*.local'
+    - 'localhost'
+    - 'dns.google'
+    - '+.lan'
+    - '+.internal'
+    - 'time.*'
+    - "*.ts.net" # Tailscale 的短域名
+    - "744944.xyz"
+    - "*.744944.xyz"
+    - "*.*.744944.xyz"
+    - '*.*.argotunnel.com'
+  nameserver:
+    - https://doh.pub/dns-query
+    - https://dns.alidns.com/dns-query
+  fallback:
+    - https://1.1.1.1/dns-query
+  fallback-filter:
+    geoip: false
+  nameserver-policy:
+    "*.ts.net": "100.100.100.100"
+geo-update-interval: 144
+
+rules:
+  # {{tailscale
+  # - PROCESS-NAME-REGEX,.*tailscale.*,DIRECT
+  - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
+  - IP-CIDR,fd7a:115c:a1e0::/48,DIRECT,no-resolve  # Tailscale IPv6
+  # }}
+  - PROCESS-NAME,cloudflared,DIRECT
+  # - DOMAIN-SUFFIX,githubcopilot.com,DIRECT
+  - DOMAIN-SUFFIX,kimi.team,DIRECT
+  - DOMAIN-SUFFIX,msh.team,DIRECT
+  # - DOMAIN-SUFFIX,microsoft.com,DIRECT
+  - RULE-SET,applications,DIRECT
+  - DOMAIN,clash.razord.top,DIRECT
+  - DOMAIN,yacd.haishan.me,DIRECT
+  - RULE-SET,private,DIRECT
+  - RULE-SET,reject,REJECT
+  - RULE-SET,icloud,DIRECT
+  - RULE-SET,apple,DIRECT
+  - RULE-SET,google,PROXY
+  - RULE-SET,proxy,PROXY
+  - RULE-SET,direct,DIRECT
+  - RULE-SET,lancidr,DIRECT
+  - RULE-SET,cncidr,DIRECT
+  - RULE-SET,telegramcidr,PROXY
+  - GEOIP,LAN,DIRECT
+  - GEOIP,CN,DIRECT
+  - MATCH,PROXY
+
+proxy-providers:
+  mysub:
+    type: http
+    url: https://example.com/clash.yaml
+    path: ./mysub.yaml
+    interval: 86400
+    header:
+      User-Agent:
+      - "Clash/v1.18.0"
+      - "mihomo/1.19.6"
+    health-check:               # 让 mihomo 自动剔除不可用节点
+      enable: true
+      url: http://www.gstatic.com/generate_204
+      interval: 300             # 每 5 分钟测一次
+
+proxy-groups:
+  - name: PROXY
+    type: url-test
+    use:                        # 关键：把 provider 的节点引入策略组
+      - mysub                  # 与上面的 provider 名保持一致
+    url: http://www.gstatic.com/generate_204
+    interval: 300
+
+rule-providers:
+  reject:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/reject.txt"
+    path: ./ruleset/reject.yaml
+    interval: 86400
+
+  icloud:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/icloud.txt"
+    path: ./ruleset/icloud.yaml
+    interval: 86400
+
+  apple:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/apple.txt"
+    path: ./ruleset/apple.yaml
+    interval: 86400
+
+  google:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/google.txt"
+    path: ./ruleset/google.yaml
+    interval: 86400
+
+  proxy:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/proxy.txt"
+    path: ./ruleset/proxy.yaml
+    interval: 86400
+
+  direct:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/direct.txt"
+    path: ./ruleset/direct.yaml
+    interval: 86400
+
+  private:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/private.txt"
+    path: ./ruleset/private.yaml
+    interval: 86400
+
+  gfw:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt"
+    path: ./ruleset/gfw.yaml
+    interval: 86400
+
+  tld-not-cn:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/tld-not-cn.txt"
+    path: ./ruleset/tld-not-cn.yaml
+    interval: 86400
+
+  telegramcidr:
+    type: http
+    behavior: ipcidr
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/telegramcidr.txt"
+    path: ./ruleset/telegramcidr.yaml
+    interval: 86400
+
+  cncidr:
+    type: http
+    behavior: ipcidr
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/cncidr.txt"
+    path: ./ruleset/cncidr.yaml
+    interval: 86400
+
+  lancidr:
+    type: http
+    behavior: ipcidr
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/lancidr.txt"
+    path: ./ruleset/lancidr.yaml
+    interval: 86400
+
+  applications:
+    type: http
+    behavior: classical
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/applications.txt"
+    path: ./ruleset/applications.yaml
+    interval: 86400
