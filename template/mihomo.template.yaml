@@ -84,8 +84,6 @@ rules:
   # }}
   - PROCESS-NAME,cloudflared,DIRECT
   # - DOMAIN-SUFFIX,githubcopilot.com,DIRECT
-  - DOMAIN-SUFFIX,kimi.team,DIRECT
-  - DOMAIN-SUFFIX,msh.team,DIRECT
   # - DOMAIN-SUFFIX,microsoft.com,DIRECT
   - RULE-SET,applications,DIRECT
   - DOMAIN,clash.razord.top,DIRECT
@@ -104,7 +102,8 @@ rules:
   - GEOIP,CN,DIRECT
   - MATCH,PROXY
 
-proxy-providers:
+# NOTE: 你需要把这里替换成你自己的订阅
+proxy-providers: 
   mysub:
     type: http
     url: https://example.com/clash.yaml
