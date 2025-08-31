@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+all_inputs="$*"
+if [ -z "$all_inputs" ]; then
+    # use stdin
+    all_inputs=$(cat)
+fi
+
+goose run --no-session -q -t "$all_inputs"
