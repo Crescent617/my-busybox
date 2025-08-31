@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 
-all_inputs="$*"
-if [ -z "$all_inputs" ]; then
-    # use stdin
+all_inputs=""
+if [ $# -gt 0 ]; then
+    # 有参数，直接用参数
+    all_inputs="$*"
+elif [ ! -t 0 ]; then
+    # 没有参数，且 stdin 是管道
     all_inputs=$(cat)
+else
+    # 进入交互模式
+    exec goose
 fi
 
 goose run --no-session -q -t "$all_inputs"
