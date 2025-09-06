@@ -1,6 +1,31 @@
-# This is a template for mihomo, a Clash configuration file.
-# It includes settings for tun, dns, proxy providers, proxy groups, and rule providers.
-# You need to replace the **proxy-providers** and **proxy-groupssections** with your own configurations.
+# 这是 mihomo 的模板，一个 Clash 配置文件。
+# 包含 tun、dns、代理提供者、代理组和规则提供者的设置。
+# NOTE: 你需要用你自己的配置替换 **proxy-providers** 和 **proxy-groupssections** 部分。
+
+proxy-providers:
+  mysub:
+    type: http
+    url: https://example.com/clash.yaml
+    path: ./mysub.yaml
+    interval: 86400 # 每天更新一次
+    header:
+      User-Agent:
+        - "Clash/v1.18.0"
+        - "mihomo/1.19.6"
+    health-check: # 让 mihomo 自动剔除不可用节点
+      enable: true
+      url: http://www.gstatic.com/generate_204
+      interval: 300 # 每 5 分钟测一次
+
+proxy-groups:
+  - name: PROXY
+    type: url-test
+    use: # 关键：把 provider 的节点引入策略组
+      - mysub # 与上面的 provider 名保持一致
+    url: http://www.gstatic.com/generate_204
+    interval: 300
+
+# ======= 通用配置 =======
 port: 7890
 socks-port: 7891
 # redir-port: 7892
@@ -8,20 +33,21 @@ allow-lan: true
 mode: rule
 log-level: warning
 # log-level: info
-external-controller: '0.0.0.0:9090'
-secret: ''
-external-ui: ui
+external-controller: "0.0.0.0:9090"
+secret: ""
+# external-ui: ui
+geo-auto-update: true
 
+# ======= TUN 和 DNS 设置 =======
 tun:
   enable: true
   stack: system # system / gvisor，mac 上推荐 system
-  device: utun233 # 设备名称
-  dns-hijack:
-    - any:53
-    - tcp://any:53
+  # device: utun233 # 设备名称
   auto-route: true # 自动配置路由
+  auto-redirect: true
   # auto-route-ipv6: false
   auto-detect-interface: true
+  # TODO: use rule-set to exclude some addresses. refer to https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/applications.txt"
   route-exclude-address:
     - 100.64.0.0/10 # Tailscale
     - fd7a:115c:a1e0::/48
@@ -46,41 +72,26 @@ tun:
     - 2405:b500::/32
     - 2405:8100::/32
     - 2a06:98c0::/29
-    - 2c0f:f248::/32 
+    - 2c0f:f248::/32
+
 dns:
   enable: true
   ipv6: true
-  listen: 0.0.0.0:53
   enhanced-mode: fake-ip
-  fake-ip-range: 198.18.0.1/16
   fake-ip-filter:
-    - '*.local'
-    - 'localhost'
-    - 'dns.google'
-    - '+.lan'
-    - '+.internal'
-    - 'time.*'
-    - "*.ts.net" # Tailscale 的短域名
+    - "rule-set:private"
+    - "*.*.argotunnel.com" # cloudflare tunnel
+    - "*.tailscale.com" # Tailscale register domain
     - "744944.xyz"
     - "*.744944.xyz"
     - "*.*.744944.xyz"
-    - '*.*.argotunnel.com'
-  nameserver:
-    - https://doh.pub/dns-query
-    - https://dns.alidns.com/dns-query
-  fallback:
-    - https://1.1.1.1/dns-query
-  fallback-filter:
-    geoip: false
-  nameserver-policy:
-    "*.ts.net": "100.100.100.100"
-geo-update-interval: 144
 
+# ======= 规则设置 =======
 rules:
-  # {{tailscale
+  # {{ tailscale
   # - PROCESS-NAME-REGEX,.*tailscale.*,DIRECT
   - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
-  - IP-CIDR,fd7a:115c:a1e0::/48,DIRECT,no-resolve  # Tailscale IPv6
+  - IP-CIDR,fd7a:115c:a1e0::/48,DIRECT,no-resolve # Tailscale IPv6
   # }}
   - PROCESS-NAME,cloudflared,DIRECT
   # - DOMAIN-SUFFIX,githubcopilot.com,DIRECT
@@ -102,30 +113,7 @@ rules:
   - GEOIP,CN,DIRECT
   - MATCH,PROXY
 
-# NOTE: 你需要把这里替换成你自己的订阅
-proxy-providers: 
-  mysub:
-    type: http
-    url: https://example.com/clash.yaml
-    path: ./mysub.yaml
-    interval: 86400
-    header:
-      User-Agent:
-      - "Clash/v1.18.0"
-      - "mihomo/1.19.6"
-    health-check:               # 让 mihomo 自动剔除不可用节点
-      enable: true
-      url: http://www.gstatic.com/generate_204
-      interval: 300             # 每 5 分钟测一次
-
-proxy-groups:
-  - name: PROXY
-    type: url-test
-    use:                        # 关键：把 provider 的节点引入策略组
-      - mysub                  # 与上面的 provider 名保持一致
-    url: http://www.gstatic.com/generate_204
-    interval: 300
-
+# github clash-rules 仓库的规则
 rule-providers:
   reject:
     type: http
