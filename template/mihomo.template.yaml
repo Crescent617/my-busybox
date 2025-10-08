@@ -78,6 +78,13 @@ dns:
   enable: true
   ipv6: true
   enhanced-mode: fake-ip
+  nameserver:
+    - https://1.1.1.1/dns-query
+    - https://doh.pub/dns-query
+    - https://dns.alidns.com/dns-query
+  fallback:
+    - 8.8.8.8
+    - 1.1.1.1
   fake-ip-filter:
     - "rule-set:private"
     - "*.*.argotunnel.com" # cloudflare tunnel
