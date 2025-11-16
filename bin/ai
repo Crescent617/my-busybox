@@ -1,15 +1,23 @@
 #!/usr/bin/env bash
 
 all_inputs=""
-if [ $# -gt 0 ]; then
-    # 有参数，直接用参数
-    all_inputs="$*"
-elif [ ! -t 0 ]; then
+if [ ! -t 0 ]; then
     # 没有参数，且 stdin 是管道
     all_inputs=$(cat)
-else
+fi
+
+if [ $# -gt 0 ]; then
+    # 拼接所有参数，作为输入
+    if [ -n "$all_inputs" ]; then
+        all_inputs="$all_inputs \n---\n $*"
+    else
+        all_inputs="$*"
+    fi
+fi
+
+if [ -z "$all_inputs" ]; then
     # 进入交互模式
     exec goose
 fi
 
-goose run --no-session -q -t "$all_inputs"
+goose run -q --system 'you are helpful assistant.' -t "$all_inputs"
