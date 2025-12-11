@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+
+import argparse
+import gzip
+import json
+import ssl
+import sys
+import urllib.request
+
+
+def request(
+    url: str,
+    payload_str: str,
+    extra_headers=None,
+    method="POST",
+    verify_ssl=True,
+):
+    """
+    发送请求。
+    enable_stream=False (默认): 发送 application/json (纯 JSON)
+    enable_stream=True  (--stream):    发送 application/connect+json (有 5 字节前缀，分帧)
+    """
+
+    headers = {
+        "accept": "*/*",
+        "user-agent": "Connect-Curl/0.3",
+        "content-type": "application/json",
+        "connect-protocol-version": "1",
+        "connect-accept-encoding": "gzip",
+    }
+
+    if extra_headers:
+        for key, value in extra_headers.items():
+            headers[key.lower()] = value
+
+    try:
+        json_obj = json.loads(payload_str)
+        json_bytes = json.dumps(json_obj).encode("utf-8")
+    except json.JSONDecodeError:
+        raise Exception("Input data is not valid JSON")
+
+    enable_stream = headers.get("content-type") == "application/connect+json"
+
+    if enable_stream:
+        # 构造帧: [Flag (1)] + [Length (4)] + [Payload]
+        req_data = b"\x00" + len(json_bytes).to_bytes(4, "big") + json_bytes
+    else:
+        req_data = json_bytes
+
+    req = urllib.request.Request(url, data=req_data, headers=headers, method=method)
+
+    ctx = (
+        ssl.create_default_context() if verify_ssl else ssl._create_unverified_context()
+    )
+
+    with urllib.request.urlopen(req, context=ctx) as response:
+        # === 普通模式 (Unary) 处理 ===
+        if not enable_stream:
+            body = response.read()
+            # 简单检查响应是否被压缩
+            if response.headers.get("Content-Encoding") == "gzip":
+                body = gzip.decompress(body)
+            yield body
+            return
+
+        # === 流式模式 (Stream) 处理 ===
+        while True:
+            header_data = response.read(5)
+            if not header_data:
+                break
+
+            if len(header_data) < 5:
+                raise Exception(
+                    f"Incomplete frame header: received {len(header_data)} bytes"
+                )
+
+            flag = header_data[0]
+            length = int.from_bytes(header_data[1:5], "big")
+
+            payload = response.read(length)
+            if len(payload) < length:
+                raise Exception(f"Incomplete frame payload")
+
+            if flag & 0x01:  # Compressed
+                payload = gzip.decompress(payload)
+
+            yield payload
+
+
+def parse_headers(header_list):
+    headers = {}
+    if not header_list:
+        return headers
+    for h in header_list:
+        if ":" in h:
+            key, value = h.split(":", 1)
+            headers[key.strip()] = value.strip()
+    return headers
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="ConnectRPC/JSON Client")
+    parser.add_argument("url", help="Target URL")
+    parser.add_argument("-d", "--data", required=True, help="JSON body")
+    parser.add_argument("-H", "--header", action="append", help="Custom header")
+    parser.add_argument(
+        "-k", "--insecure", action="store_true", help="Ignore SSL errors"
+    )
+    parser.add_argument(
+        "--pretty", action="store_true", help="Pretty-print JSON output"
+    )
+
+    # 使用 --stream 显式开启流模式
+    parser.add_argument(
+        "--stream",
+        action="store_true",
+        help="Enable ConnectRPC streaming protocol (binary framing)",
+    )
+
+    args = parser.parse_args()
+    if args.stream:
+        args.header = args.header or []
+        args.header.append("Content-Type: application/connect+json")
+
+    try:
+        for chunk in request(
+            args.url,
+            args.data,
+            extra_headers=parse_headers(args.header),
+            verify_ssl=not args.insecure,
+        ):
+            if args.pretty:
+                try:
+                    json_obj = json.loads(chunk)
+                    print(json.dumps(json_obj, indent=2, ensure_ascii=False))
+                except json.JSONDecodeError:
+                    print(chunk.decode("utf-8"))
+            else:
+                print(chunk.decode("utf-8"))
+    except Exception as e:
+        # 简单打印错误，不打印冗长的 Traceback (除非你需要调试)
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
