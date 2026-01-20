@@ -1,4 +1,13 @@
 #!/usr/bin/env python3
+"""
+This is a simple ConnectRPC/JSON client implemented in Python.
+
+Example usage:
+1. Unary request (default):
+    connectcurl https://example.com/api -d '{"key":"value"}'
+2. Streaming request:
+    connectcurl https://example.com/api -d '{"key":"value"}' --stream
+"""
 
 import argparse
 import gzip
@@ -10,7 +19,7 @@ import urllib.request
 
 def request(
     url: str,
-    payload_str: str,
+    payload_str: str = "",
     extra_headers=None,
     method="POST",
     verify_ssl=True,
@@ -33,19 +42,26 @@ def request(
         for key, value in extra_headers.items():
             headers[key.lower()] = value
 
-    try:
-        json_obj = json.loads(payload_str)
-        json_bytes = json.dumps(json_obj).encode("utf-8")
-    except json.JSONDecodeError:
-        raise Exception("Input data is not valid JSON")
-
     enable_stream = headers.get("content-type") == "application/connect+json"
 
-    if enable_stream:
-        # 构造帧: [Flag (1)] + [Length (4)] + [Payload]
-        req_data = b"\x00" + len(json_bytes).to_bytes(4, "big") + json_bytes
-    else:
-        req_data = json_bytes
+    req_data = None
+
+    if len(payload_str) > 0:
+        if payload_str[0] == "\x00" and enable_stream:
+            # 已经是帧格式，直接发送
+            req_data = payload_str.encode("utf-8")
+        else:
+            try:
+                json_obj = json.loads(payload_str)
+                json_bytes = json.dumps(json_obj).encode("utf-8")
+            except json.JSONDecodeError:
+                raise Exception("Input data is not valid JSON")
+
+            if enable_stream:
+                # 构造帧: [Flag (1)] + [Length (4)] + [Payload]
+                req_data = b"\x00" + len(json_bytes).to_bytes(4, "big") + json_bytes
+            else:
+                req_data = json_bytes
 
     req = urllib.request.Request(url, data=req_data, headers=headers, method=method)
 
@@ -101,7 +117,9 @@ def parse_headers(header_list):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ConnectRPC/JSON Client")
     parser.add_argument("url", help="Target URL")
-    parser.add_argument("-d", "--data", required=True, help="JSON body")
+    parser.add_argument("-d", "--data", help="JSON body")
+    parser.add_argument("--data-raw", help="Raw body", dest="data")
+
     parser.add_argument("-H", "--header", action="append", help="Custom header")
     parser.add_argument(
         "-k", "--insecure", action="store_true", help="Ignore SSL errors"
@@ -109,18 +127,26 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pretty", action="store_true", help="Pretty-print JSON output"
     )
+    parser.add_argument("-b", "--cookie", help="Cookie header value")
 
     # 使用 --stream 显式开启流模式
     parser.add_argument(
+        "-s",
         "--stream",
         action="store_true",
         help="Enable ConnectRPC streaming protocol (binary framing)",
     )
 
     args = parser.parse_args()
+    args.header = args.header or []
+
     if args.stream:
-        args.header = args.header or []
         args.header.append("Content-Type: application/connect+json")
+    if args.cookie:
+        args.header.append(f"Cookie: {args.cookie}")
+
+    if args.data is None:
+        args.data = args.data_raw
 
     try:
         for chunk in request(
@@ -132,11 +158,15 @@ if __name__ == "__main__":
             if args.pretty:
                 try:
                     json_obj = json.loads(chunk)
-                    print(json.dumps(json_obj, indent=2, ensure_ascii=False))
+                    print(
+                        json.dumps(json_obj, indent=2, ensure_ascii=False), flush=True
+                    )
                 except json.JSONDecodeError:
-                    print(chunk.decode("utf-8"))
+                    print(chunk.decode("utf-8"), flush=True)
             else:
-                print(chunk.decode("utf-8"))
+                print(chunk.decode("utf-8"), flush=True)
+    except KeyboardInterrupt:
+        sys.exit(130)
     except Exception as e:
         # 简单打印错误，不打印冗长的 Traceback (除非你需要调试)
         print(f"Error: {e}", file=sys.stderr)
