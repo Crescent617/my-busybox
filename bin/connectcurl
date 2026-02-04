@@ -23,6 +23,7 @@ def request(
     extra_headers=None,
     method="POST",
     verify_ssl=True,
+    verbose=False,
 ):
     """
     发送请求。
@@ -65,11 +66,22 @@ def request(
 
     req = urllib.request.Request(url, data=req_data, headers=headers, method=method)
 
+    if verbose:
+        print(f"> {method.upper()} {url}", file=sys.stderr)
+        for key, value in headers.items():
+            print(f"> {key}: {value}", file=sys.stderr)
+        print(file=sys.stderr)
+
     ctx = (
         ssl.create_default_context() if verify_ssl else ssl._create_unverified_context()
     )
 
     with urllib.request.urlopen(req, context=ctx) as response:
+        if verbose:
+            print(f"< HTTP/{getattr(response, 'version', '1.1')} {response.status} {response.reason}", file=sys.stderr)
+            for key, value in response.headers.items():
+                print(f"< {key}: {value}", file=sys.stderr)
+            print(file=sys.stderr)
         # === 普通模式 (Unary) 处理 ===
         if not enable_stream:
             body = response.read()
@@ -137,6 +149,10 @@ if __name__ == "__main__":
         help="Enable ConnectRPC streaming protocol (binary framing)",
     )
 
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Show request and response headers"
+    )
+
     args = parser.parse_args()
     args.header = args.header or []
 
@@ -154,6 +170,7 @@ if __name__ == "__main__":
             args.data,
             extra_headers=parse_headers(args.header),
             verify_ssl=not args.insecure,
+            verbose=args.verbose,
         ):
             if args.pretty:
                 try:
