@@ -178,3 +178,4 @@ pyrightconfig.json
 .env
 .opencode
 .aider*
+.worktrees
